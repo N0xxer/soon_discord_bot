@@ -135,25 +135,6 @@ class VoiceChannelsCog(commands.Cog):
                 allowed_mentions=disnake.AllowedMentions.none(),
             )
 
-        # 2. Удаление канала
-        if before.channel and isinstance(before.channel, disnake.VoiceChannel):
-            channel = before.channel
-            is_target_category = channel.category_id == self.voice_category_id
-            is_not_ignored = channel.id not in self.ignored_channel_ids
-
-            if is_target_category and is_not_ignored:
-                # Исключаем пользователя, который выходит/переходит, из списка оставшихся
-                remaining_members = [m for m in channel.members if m.id != member.id]
-
-                if len(remaining_members) == 0:
-                    owner_id = await get_owner_by_channel_id(channel.id)
-                    if owner_id:
-                        await clear_channel_owner(channel.id)
-                        try:
-                            await channel.delete()
-                        except disnake.NotFound:
-                            pass
-
     @commands.Cog.listener()
     async def on_button_click(self, inter: disnake.MessageInteraction):
         """Открытие модальных окон при клике на кнопки."""

@@ -27,7 +27,22 @@ class VoiceChannelsCog(commands.Cog):
         self, member: disnake.Member, before: disnake.VoiceState, after: disnake.VoiceState
     ):
         """Создание и удаление временных каналов."""
-        # 1. Создание канала
+        # 1. Сначала удаляем старый канал, если пользователь его покинул
+        if before.channel and isinstance(before.channel, disnake.VoiceChannel):
+            old_channel = before.channel
+            is_target_category = old_channel.category_id == self.voice_category_id
+            is_not_ignored = old_channel.id not in self.ignored_channel_ids
+
+            if is_target_category and is_not_ignored:
+                remaining = [m for m in old_channel.members if m.id != member.id]
+                if len(remaining) == 0:
+                    await clear_channel_owner(old_channel.id)
+                    try:
+                        await old_channel.delete()
+                    except disnake.NotFound:
+                        pass
+
+        # 2. Создание канала при входе в канал создания
         if after.channel and after.channel.id == self.create_channel_id:
             guild = member.guild
             category = after.channel.category
@@ -68,7 +83,10 @@ class VoiceChannelsCog(commands.Cog):
             )
 
             await update_voice_config(member.id, "vc_channels_ids", str(new_channel.id))
-            await member.move_to(new_channel)
+            
+            # Перемещаем только после того, как ID сохранен
+            if member.voice and member.voice.channel:
+                await member.move_to(new_channel)
 
             timestamp = int(disnake.utils.utcnow().timestamp())
 

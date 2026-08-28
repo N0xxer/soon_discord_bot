@@ -94,7 +94,7 @@ class VoiceChannelsCog(commands.Cog):
             components = [
                 ui.Container(
                     ui.TextDisplay(
-                        f"# Комната {channel_name}\n"
+                        f"# Управление комнатой пользователя\n"
                         f"**Владелец:** {member.mention}\n"
                         f"**Создана:** <t:{timestamp}:f>"
                     ),

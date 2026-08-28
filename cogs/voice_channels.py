@@ -27,25 +27,27 @@ class VoiceChannelsCog(commands.Cog):
         self, member: disnake.Member, before: disnake.VoiceState, after: disnake.VoiceState
     ):
         """Создание и удаление временных каналов."""
-        # 1. Сначала удаляем старый канал, если пользователь его покинул
-        if before.channel and isinstance(before.channel, disnake.VoiceChannel):
-            old_channel = before.channel
-            is_target_category = old_channel.category_id == self.voice_category_id
-            is_not_ignored = old_channel.id not in self.ignored_channel_ids
+        # Игнорируем муты, заглушки звука и стримы внутри того же канала
+        if before.channel == after.channel:
+            return
 
-            if is_target_category and is_not_ignored:
-                remaining = [m for m in old_channel.members if m.id != member.id]
-                if len(remaining) == 0:
-                    await clear_channel_owner(old_channel.id)
-                    try:
-                        await old_channel.delete()
-                    except disnake.NotFound:
-                        pass
-
-        # 2. Создание канала при входе в канал создания
+        # 1. Если зашли в триггер-канал
         if after.channel and after.channel.id == self.create_channel_id:
             guild = member.guild
             category = after.channel.category
+
+            # Удаляем предыдущую комнату пользователя, если она осталась пустой
+            old_vc_id = await get_voice_config(member.id, "vc_channels_ids")
+            if old_vc_id:
+                old_room = guild.get_channel(int(old_vc_id))
+                if old_room and isinstance(old_room, disnake.VoiceChannel):
+                    remaining = [m for m in old_room.members if m.id != member.id]
+                    if len(remaining) == 0:
+                        await clear_channel_owner(old_room.id)
+                        try:
+                            await old_room.delete()
+                        except disnake.NotFound:
+                            pass
 
             saved_name = await get_voice_config(member.id, "name")
             saved_limit = await get_voice_config(member.id, "user_limit")
@@ -84,7 +86,6 @@ class VoiceChannelsCog(commands.Cog):
 
             await update_voice_config(member.id, "vc_channels_ids", str(new_channel.id))
             
-            # Перемещаем только после того, как ID сохранен
             if member.voice and member.voice.channel:
                 await member.move_to(new_channel)
 
@@ -134,6 +135,22 @@ class VoiceChannelsCog(commands.Cog):
                 components=components,
                 allowed_mentions=disnake.AllowedMentions.none(),
             )
+            return
+
+        # 2. Обычный выход / переключение в другой канал
+        if before.channel and isinstance(before.channel, disnake.VoiceChannel):
+            channel = before.channel
+            is_target_category = channel.category_id == self.voice_category_id
+            is_not_ignored = channel.id not in self.ignored_channel_ids
+
+            if is_target_category and is_not_ignored:
+                remaining = [m for m in channel.members if m.id != member.id]
+                if len(remaining) == 0:
+                    await clear_channel_owner(channel.id)
+                    try:
+                        await channel.delete()
+                    except disnake.NotFound:
+                        pass
 
     @commands.Cog.listener()
     async def on_button_click(self, inter: disnake.MessageInteraction):
